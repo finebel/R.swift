@@ -76,6 +76,12 @@ extension App {
         mutating func run() throws {
             let processInfo = ProcessInfo()
 
+            let configurationFileName = ".rswiftConfiguration.json"
+            guard isEnabled(processInfo: processInfo, configurationFileName: configurationFileName) else {
+                print("Rswift is disabled via \(configurationFileName) file")
+                return
+            }
+            
             let productModuleName = processInfo.environment[EnvironmentKeys.productModuleName]
             let infoPlistFile = processInfo.environment[EnvironmentKeys.infoPlistFile]
             let codeSignEntitlements = processInfo.environment[EnvironmentKeys.codeSignEntitlements]
@@ -203,5 +209,30 @@ extension ProcessInfo {
     func environmentVariable(name: String) throws -> String {
         guard let value = self.environment[name] else { throw ValidationError("Missing argument \(name)") }
         return value
+    }
+}
+
+private extension App.Generate {
+    func isEnabled(processInfo: ProcessInfo, configurationFileName: String) -> Bool {
+        guard let sourceRootEnv = processInfo.environment[EnvironmentKeys.sourceRoot] else {
+            print("Rswift is enabled, since the environment doesn't contain any value for \(EnvironmentKeys.sourceRoot)")
+            return true
+        }
+        
+        let configurationFileURL = URL(fileURLWithPath: sourceRootEnv).appendingPathComponent(configurationFileName)
+        guard FileManager.default.fileExists(atPath: configurationFileURL.path) else {
+            print("Rswift is enabled, since no configuration file is found under \(configurationFileURL.absoluteString)")
+            return true
+        }
+        
+        do {
+            let configurationData = try Data(contentsOf: configurationFileURL)
+            let configuration = try JSONDecoder().decode(RswiftConfiguration.self, from: configurationData)
+            
+            return configuration.isEnabled
+        } catch {
+            print("Rswift is enabled, since configuration file under \(configurationFileURL.absoluteString) is in an invalid format")
+            return true
+        }
     }
 }
