@@ -77,8 +77,8 @@ extension App {
             let processInfo = ProcessInfo()
 
             let configurationFileName = ".rswiftConfiguration.json"
-            guard isEnabled(processInfo: processInfo, configurationFileName: configurationFileName) else {
-                print("Rswift is disabled via \(configurationFileName) file")
+            guard shouldRun(processInfo: processInfo, configurationFileName: configurationFileName, outputPath: outputPath) else {
+                print("Rswift won't run because of configuration in \(configurationFileName) file")
                 return
             }
             
@@ -213,15 +213,15 @@ extension ProcessInfo {
 }
 
 private extension App.Generate {
-    func isEnabled(processInfo: ProcessInfo, configurationFileName: String) -> Bool {
+    func shouldRun(processInfo: ProcessInfo, configurationFileName: String, outputPath: String) -> Bool {
         guard let sourceRootEnv = processInfo.environment[EnvironmentKeys.sourceRoot] else {
-            print("Rswift is enabled, since the environment doesn't contain any value for \(EnvironmentKeys.sourceRoot)")
+            print("Rswift will run because the environment doesn't contain any value for \(EnvironmentKeys.sourceRoot)")
             return true
         }
         
         let configurationFileURL = URL(fileURLWithPath: sourceRootEnv).appendingPathComponent(configurationFileName)
         guard FileManager.default.fileExists(atPath: configurationFileURL.path) else {
-            print("Rswift is enabled, since no configuration file is found under \(configurationFileURL.absoluteString)")
+            print("Rswift will run because no configuration file is found under \(configurationFileURL.path)")
             return true
         }
         
@@ -229,9 +229,21 @@ private extension App.Generate {
             let configurationData = try Data(contentsOf: configurationFileURL)
             let configuration = try JSONDecoder().decode(RswiftConfiguration.self, from: configurationData)
             
-            return configuration.isEnabled
+            if configuration.onlyRunWhenOutputFileIsMissing {
+                let doesOutputFileExist = FileManager.default.fileExists(atPath: outputPath)
+                print(
+                    doesOutputFileExist ? "Rswift won't run because output file under \(outputPath) already exists" :
+                        "Rswift will run because output file under \(outputPath) doesn't exist"
+                )
+                
+                return !doesOutputFileExist
+            } else {
+                print("Rswift will run because of explicit configuration in \(configurationFileName)")
+                
+                return true
+            }
         } catch {
-            print("Rswift is enabled, since configuration file under \(configurationFileURL.absoluteString) is in an invalid format")
+            print("Rswift will run because configuration file under \(configurationFileURL.path) is in an invalid format")
             return true
         }
     }

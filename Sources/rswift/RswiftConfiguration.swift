@@ -8,5 +8,5 @@
 import Foundation
 
 struct RswiftConfiguration: Decodable {
-    let isEnabled: Bool
+    let onlyRunWhenOutputFileIsMissing: Bool
 }
